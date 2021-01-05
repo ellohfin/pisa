@@ -497,6 +497,25 @@ class Analysis(object):
                 theta23_orig,theta23_case1,theta23_case2 = get_separate_t23_octant_params(hypo_maker,inflection_point)
                 hypo_maker.update_params(theta23_case1)
 
+            # If fitting nsi parameters on both sides of their symmetry, define both parameter values to be fitted
+            # apply to FD parameters (eps_ee and eps_tautau) and FC parameter phases
+            fit_nsi_ranges_separately = True
+            if fit_nsi_ranges_separately:
+                have_setup_second_nsi_range = False
+                for param in hypo_maker.params:
+                    if (param.name == "eps_ee") and (not param.is_fixed):
+                        nsi_inflection_point = -1.
+                        param_case2 = deepcopy(param)
+                        have_setup_second_nsi_range = True
+                    elif (param.name == "eps_tautau") and (not param.is_fixed):
+                        nsi_inflection_point = 0.
+                        param_case2 = deepcopy(param)
+                        have_setup_second_nsi_range = True
+                    elif (param.name in ["eps_emu_phase", "eps_etau_phase", "eps_mutau_phase"]) and (not param.is_fixed):
+                        nsi_inflection_point = 180. * ureg.degree
+                        param_case2 = deepcopy(param)
+                        have_setup_second_nsi_range = True
+
             # Perform the fit
             best_fit_info = self.fit_hypo_inner(
                 hypo_maker=hypo_maker,
@@ -509,6 +528,45 @@ class Analysis(object):
                 external_priors_penalty=external_priors_penalty
             )
             
+
+            if fit_nsi_ranges_separately and have_setup_second_nsi_range:
+                for param in hypo_maker.params:
+                    if (param.name in ["eps_ee", 'eps_tautau', 'eps_emu_phase', 'eps_etau_phase', 'eps_mutau_phase']) and (not param.is_fixed):
+                        param_case2.value = 2.*nsi_inflection_point - param.value
+                        hypo_maker.update_params(param_case2)
+                # Re-run minimizer starting at new point
+                new_fit_info = self.fit_hypo_inner(
+                    hypo_maker=hypo_maker,
+                    data_dist=data_dist,
+                    metric=metric,
+                    minimizer_settings=minimizer_settings,
+                    other_metrics=other_metrics,
+                    pprint=pprint,
+                    blind=blind,
+                    external_priors_penalty=external_priors_penalty
+                )
+                # Take the one with the best fit
+                if metric[0] in METRICS_TO_MAXIMIZE:
+                    it_got_better = (
+                        new_fit_info['metric_val'] > best_fit_info['metric_val']
+                    )
+                else:
+                    it_got_better = (
+                        new_fit_info['metric_val'] < best_fit_info['metric_val']
+                    )
+
+                if it_got_better:
+                    alternate_fits.append(best_fit_info)
+                    best_fit_info = new_fit_info
+                    if not blind:
+                        logging.debug('Accepting other-octant fit')
+                else:
+                    alternate_fits.append(new_fit_info)
+                    if not blind:
+                        logging.debug('Accepting initial-octant fit')
+
+
+
 
             # Decide whether fit for other octant is necessary
             if peforming_octant_check :
