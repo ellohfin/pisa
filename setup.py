@@ -34,7 +34,7 @@ import subprocess
 import tempfile
 
 from setuptools.command.build_ext import build_ext
-from setuptools import setup, find_packages
+from setuptools import setup, Extension, find_packages
 import versioneer
 
 
@@ -52,7 +52,7 @@ __all__ = [
 
 __author__ = 'S. Boeser, J.L. Lanfranchi, P. Eller, M. Hieronymus'
 
-__license__ = '''Copyright (c) 2014-2017, The IceCube Collaboration
+__license__ = '''Copyright (c) 2014-2020, The IceCube Collaboration
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@ INSTALL_REQUIRES = [
     'decorator',
     'kde @ git+https://github.com/icecubeopensource/kde.git',
     'h5py',
-    'iminuit',
+    'iminuit<2',
     'line_profiler',
     'matplotlib>=3.0', # 1.5: inferno colormap; 2.0: 'C0' colorspec
     'numba==0.45.1', # >=0.35: fastmath jit flag; >=0.38: issue #439; 0.44 segfaults; 0.46 removes SmartArray
@@ -98,6 +98,7 @@ INSTALL_REQUIRES = [
     'llvmlite<=0.30.0', # 0.31 gave an error "Type of #4 arg mismatch: i1 != i32" in pisa/stages/osc/layers.py", line 91
     'py-cpuinfo',
     'sympy',
+    'cython',
 ]
 
 EXTRAS_REQUIRE = {
@@ -207,8 +208,10 @@ def do_setup():
     #    )
 
     # Collect (build-able) external modules and package_data
-    ext_modules = []
-
+    ext_modules = [Extension('pisa.utils.llh_defs.poisson_gamma_mixtures', 
+                                sources = ['pisa/utils/llh_defs/poisson_gamma_mixtures.pyx',
+                                           'pisa/utils/llh_defs/poisson_gamma.c'])
+                  ]
     # Include these things in source (and binary?) distributions
     package_data = {}
 
